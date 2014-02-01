@@ -86,8 +86,8 @@ amari_tw_pca = zeros(num_SNR,MC_times);
 rse_tw_pca = zeros(num_SNR,MC_times);
 matlabpool open
 for iSNR = 1:num_SNR
-	parfor iMC = 1:MC_times
-		[simu_EEG(iSNR,iMC,:,:,:),A_or(iSNR,iMC,:,:),Z_or(iSNR,iMC,:,:)]= ERP_data_gen(SNR(iSNR),iMC,chan,len,trial,fs,flag_fig);
+    parfor iMC = 1:MC_times
+	[simu_EEG(iSNR,iMC,:,:,:),A_or(iSNR,iMC,:,:),Z_or(iSNR,iMC,:,:)]= ERP_data_gen(SNR(iSNR),iMC,chan,len,trial,fs,flag_fig);
         
         [A(iSNR,iMC,:,:),C(iSNR,iMC,:,:),Z(iSNR,iMC,:,:),nc_est(iSNR,iMC)] = ERP_CCA_sparsev4_2(squeeze(simu_EEG(iSNR,iMC,:,:,:)),frq_up,nc_up,fs,lambda); %%% Z is waveform; C is coefficients; A is spatial pattern
         
