@@ -1,4 +1,4 @@
-function [A,C] = ERP_CCA_sparsev4_2(simu_EEG,frq_up,nc_up,fs,lambda)
+function [A,C,Z,nc_est] = ERP_CCA_sparsev4_2(simu_EEG,frq_up,nc_up,fs,lambda)
 %ERP_CCA_sparse - ERP extraction with sparse CCA
 %
 %
@@ -14,8 +14,9 @@ function [A,C] = ERP_CCA_sparsev4_2(simu_EEG,frq_up,nc_up,fs,lambda)
 % Outputs:
 %    A - spatial pattern of the ERP components chan*nc_up
 %    C - coefficient matrix nc_up*2K
+%    nc_est - number of components estimated by this method
 % Example: 
-%    [A,C] = ERP_CCA_sparse(simu_EEG,100,10,1000)
+%    [A,C,nc_est] = ERP_CCA_sparse(simu_EEG,100,10,1000,4)
 %
 % Other m-files required: ERP_date_gen.m f_alpha_gaussian.m
 % Subfunctions: none
@@ -27,6 +28,7 @@ function [A,C] = ERP_CCA_sparsev4_2(simu_EEG,frq_up,nc_up,fs,lambda)
 %Department of Biomedical Engineering, Tsinghua University
 % email: xs.wuchaohua@outlook.com
 %
+% Jan 29 2013; output number of components estimated and the ERP waveform 
 % Jan 14 2013; update to 4.2, estimating C using Empirical Bayesian or Lasso embeded in MATLAB
 % Dec 19 2013; update to version 4, use new form
 % Dec 14 2013; update A with contrain ||a_i|| = 1 
@@ -48,7 +50,7 @@ function [A,C] = ERP_CCA_sparsev4_2(simu_EEG,frq_up,nc_up,fs,lambda)
 % cvx_setup
 % cd ../
 
-addpath /home/chaohua/Documents/CCA_for_ERP/package/utilities
+%addpath /home/chaohua/Documents/CCA_for_ERP/package/utilities
 
 if nargin == 0
     clc
@@ -99,7 +101,7 @@ i = 1;dA = 0;
 
 nc_flag = true(nc,1);
 %matlabpool open
-while ((i<50)||(dA>0.001))&&(i< 500)
+while ((i< 30)||(dA>0.001))&&(i< 50)
 
 %for i = 1:250
 %%%% update C
@@ -107,7 +109,7 @@ while ((i<50)||(dA>0.001))&&(i< 500)
 
 %%%% update A
 A_pre = A;
-A = updateA(concatEEG,A,C,Phi,base,nc_flag);
+A = updateA(concatEEG,A,C,Phi,base);
 
 %%%% updata Phi
 eta = concatEEG - A*C*base;
@@ -115,31 +117,35 @@ Phi = eta*eta'/(len*trial);
 
 i = i+1;
 
-L = 0.5*log(det(Phi))*trial*len+lambda*sum(sum(abs(C)))+0.5*trace(A'*A);
+% L = 0.5*log(det(Phi))*trial*len+lambda*sum(sum(abs(C)))+0.5*trace(A'*A);
 dA = norm(A_pre-A,'fro')./norm(A_pre,'fro');
-disp(['iter = ',num2str(i),'L = ',num2str(L),'\Delta A = ',num2str(dA)]);
+% disp(['iter = ',num2str(i),'L = ',num2str(L),'\Delta A = ',num2str(dA)]);
 end
 
 %matlabpool close
-% I = sum(abs(A),1) > 10^-8;
-% A = A(:,I);
+I = sum(abs(A),1) > 10^-5;
+%A = A(:,I);
+%C = C(I,:);
+nc_est  = sum(I);
 % I = sum(abs(C),2) > 10^-8;
 % C = C(I,:);
 
-norm(sp*twave-A*C*base(:,1:len),'fro')/norm(sp*twave,'fro')
+% norm(sp*twave-A*C*base(:,1:len),'fro')/norm(sp*twave,'fro')
 [U, S, V] = svd(A*C*base(:,1:len),0);
-A_or = U(:,1:3);
-wave = S*V';
-wave = wave(1:3,:);
-ai = amari(A_or,sp,3);
+A = zeros(chan,nc);
+A(:,1:nc_est) = U(:,1:nc_est);
+Z = zeros(nc,len);
+Zt = S*V';
+Z(1:nc_est,:) = Zt(1:nc_est,:);
+% ai = amari(A_or,sp,3);
 % wave = (A\A_or)^-1*C*base;
 % wave = wave(:,1:len);
-
+end
 
 function [C,nc_flag] = updateC(concatEEG,A,C,Phi,base,nc_flag,lambda)
 
 [chan, nc] = size(A); K = size(C,2);
-
+%nc_flag = true(1,nc);
 X_tilde = Phi^(-0.5)*concatEEG*base';
 A_tilde = Phi^(-0.5)*A;
 
@@ -171,19 +177,19 @@ C=C_temp;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-for inc = 1:nc
-  	if nc_flag(inc)
-	 	if norm(C(inc,:),'fro') < 10^-4
-            nc_flag(inc) = false;
-            C(inc,:) = 0;
-        end
- 	end
+% for inc = 1:nc
+%   	if nc_flag(inc)
+% 	 	if norm(C(inc,:),'fro') < 10^-6
+%             nc_flag(inc) = false;
+%             C(inc,:) = 0;
+%         end
+%  	end
+% end
+
 end
 
-return
 
-
-function A = updateA(concatEEG,A,C,Phi,base,nc_flag)
+function A = updateA(concatEEG,A,C,Phi,base)
 
 [chan,nc] = size(A);
 X_tilde = Phi^(-0.5)*concatEEG*base';
@@ -218,6 +224,6 @@ A = Phi^0.5*A_tilde;
 % A_temp = X_hat./cof_mat;
 % 
 % A = U1*A_temp*V1';
-return
+end
 %------------- END OF CODE --------------
 

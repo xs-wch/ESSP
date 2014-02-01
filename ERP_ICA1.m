@@ -33,24 +33,31 @@ function [A,Z,nc_est] = ERP_ICA1(simu_EEG,res_pct)
 [chan,len,trial] = size(simu_EEG);
 
 %%%%%%% remove base line
+% EEG_mean = mean(simu_EEG,2);
+% EEG_mean = repmat(squeeze(EEG_mean),len,1);
+% EEG_mean = reshape(EEG_mean,chan,len,trial);
+
 EEG_mean = mean(simu_EEG,2);
 EEG_mean = repmat(EEG_mean,1,len);
-EEG_mean = reshape(EEG_mean,chan,len,trial);
 EEG_demean = simu_EEG - EEG_mean;
 
 %%%%%%%% PCA-preprocess
 EEG_concat = EEG_demean(:,:);
 
-[U,S,V] = svd(EEG_concat);
-pow_sq = cumsum(diag(S).^2);
-I_kept = cumsum(pow_sq) <= res_pct/100*pow_sq(end);
+S = eig(EEG_concat*EEG_concat');S = sort(S,'descend');
+pow_sq = cumsum(S);
+I_kept = pow_sq <= res_pct/100*pow_sq(end);
 
-nc_est = sum(I_kept);
+nc_est = sum(I_kept)+1;
 
 [weights,sphere] = runica(EEG_concat,'pca',nc_est);
-unmix = weights*sphere;
-Z = unmix*EEG_concat;
-A = pinv(unmix);
+unmix = weights;
+Z = zeros(chan,len);
+
+Zt = unmix*EEG_concat;Zt = reshape(Zt,[nc_est,len,trial]);
+Z(1:nc_est,:)  = mean(Zt,3);
+A = zeros(chan,chan);
+A(:,1:nc_est) = pinv(unmix);
 
 
 

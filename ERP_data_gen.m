@@ -41,7 +41,8 @@ chan = 30;
 len = 500;
 trial = 100;
 fs = 1000;
-flag_fig = false;
+flag_fig = true;
+iMC = 5;
 end
 
 if nargin == 1
@@ -64,7 +65,7 @@ C = randn(chan,nc);
 
 [C_temp,S_temp,V_temp] = svd(C*Z1,'econ');
 C = C_temp(:,1:nc);
-Z1 = S_temp(i:nc,1:nc)*V_temp(:,1:nc)';
+Z1 = S_temp(1:nc,1:nc)*V_temp(:,1:nc)';
 if flag_fig
 	figure;
 	subplot(1,2,1)
@@ -110,9 +111,7 @@ end
 
 spEEGsource = reshape(spEEGmix1*spEEGsource,[nspEEG,len,trial]);
 spEEG1 = spEEGsource(:,:,randperm(trial));
-%spEEG1(:,:,it) = spEEGmix1*spEEGsource(:,:,it);
-%end
-%temp = f_alpha_gaussian(len*trial,abs())
+
 
 
 
@@ -123,23 +122,11 @@ spEEG1 = spEEGsource(:,:,randperm(trial));
 tempERP = C*Z1;
 %tempERP = detrend(tempERP','constant')';
 power_ERP1 = trial.*trace(tempERP*tempERP');
-%power_spEEG1 = 0;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for it= 1:trial
-    power_spEEG1 = power_spEEG1 +trace(spEEG1(:,:,it)*spEEG1(:,:,it)');
-end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 power_spEEG1 = trace(spEEG1(:,:)*spEEG1(:,:)');
 
 ampN1 = sqrt(power_ERP1/(10^(SNR/10)*power_spEEG1));
 spEEG1 = ampN1.*spEEG1;
 
-simu_EEG1 = zeros(chan,len,trial);
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for it = 1:trial
-    simu_EEG1(:,:,it) = ERP_simu(:,:,it)+spEEG1(:,:,it);
-end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 simu_EEG1 = ERP_simu(:,:)+spEEG1(:,:);
 simu_EEG1 = reshape(simu_EEG1,[chan,len,trial]);
 
@@ -152,26 +139,8 @@ power_whn1 = trace(white_noise1(:,:)*white_noise1(:,:)');
 
 power_EEG1 = trace(simu_EEG1(:,:)*simu_EEG1(:,:)');
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for it= 1:trial
-    power_EEG1 = power_EEG1 +trace(simu_EEG1(:,:,it)*simu_EEG1(:,:,it)');
-
-    power_whn1 = power_whn1 +trace(white_noise1(:,:,it)*white_noise1(:,:,it)');
-
-end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-power_EEG1
 ampN1 = sqrt(power_EEG1/(10^(SNR_white/10)*power_whn1));
 white_noise1 = ampN1.*white_noise1;
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-for it = 1:trial
-    simu_EEG1(:,:,it) = simu_EEG1(:,:,it)+white_noise1(:,:,it);
-
-end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 simu_EEG1 = simu_EEG1(:,:)+white_noise1(:,:);
 simu_EEG1 = reshape(simu_EEG1,[chan,len,trial]);

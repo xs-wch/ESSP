@@ -35,7 +35,7 @@ function [A,Z,nc_est] = ERP_PCA(simu_EEG,res_pct)
 %%%%%%% remove base line
 EEG_mean = mean(simu_EEG,2);
 EEG_mean = repmat(EEG_mean,1,len);
-EEG_mean = reshape(EEG_mean,chan,len,trial);
+%EEG_mean = reshape(EEG_mean,chan,len,trial);
 EEG_demean = simu_EEG - EEG_mean;
 
 %%%%%%%% PCA-preprocess
@@ -43,10 +43,11 @@ EEG_trialavr = mean(EEG_demean,3);
 
 [U,S,V] = svd(EEG_trialavr);
 pow_sq = cumsum(diag(S).^2);
-I_kept = cumsum(pow_sq) <= res_pct/100*pow_sq(end);
+I_kept = pow_sq <= res_pct/100*pow_sq(end);
 
-nc_est = sum(I_kept);
-
-A = U(:,1:nc_est);
-Z = S(1:nc,1:nc)*V(:,1:nc_est)';
+nc_est = sum(I_kept)+1;
+A = zeros(chan,chan);
+A(:,1:nc_est) = U(:,1:nc_est);
+Z = zeros(chan,len);
+Z(1:nc_est,:) = S(1:nc_est,1:nc_est)*V(:,1:nc_est)';
 end
