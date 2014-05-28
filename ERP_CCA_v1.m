@@ -1,4 +1,4 @@
-function [A,C,Z,nc_est] = ERP_CCA_v1(simu_EEG,frq_up,nc_up,fs)
+function [A,C,Z,nc_est] = ERP_CCA_v1(simu_EEG,frq_up,fs)
 %ERP_CCA_sparse - ERP extraction with sparse CCA
 %
 %
@@ -59,15 +59,15 @@ if nargin == 0
     clear all
     close all
 	[simu_EEG,sp,twave]= ERP_data_gen(-15);
-	frq_up = 60;
-	nc_up = 10;
+	frq_up = 100;
+%	nc_up = 10;
 	fs = 1000;
 %    lambda = [10^-2, 10^-1, 1,4,8,16,40,10^2 ];
 end
 
 if nargin == 1
-	frq_up = 60;
-	nc_up = 10;
+	frq_up = 100;
+%	nc_up = 10;
 	fs = 1000;
 %    lambda = [10^-2, 10^-1, 1,4,8,16,40,10^2 ];
 end
@@ -83,9 +83,9 @@ for i = 1:K
 	base(i+K,:) = cos(2*pi*i/len*[0:len-1]);
 end 
 
-%%%% base norm = 1
-base_norm = diag(base*base');
-base = diag(1./sqrt(base_norm))*base;
+% %%%% base norm = 1
+% base_norm = diag(base*base');
+% base = diag(1./sqrt(base_norm))*base;
 
 %%%%% initialize Phi
 concatEEG = simu_EEG(:,:);
@@ -93,26 +93,35 @@ EEG_mean = mean(simu_EEG,3);
 eta = concatEEG - repmat(EEG_mean,1,trial);
 Phi = eta*eta'/(len*trial);
 
-A_old = zeros(chan,nc_up);
-C_old = zeros(nc_up,2*K);
+AC_old = zeros(chan,2*K);
 n_fold = 5;
 
 for i = 1:4
 
 %%%% update A C
-[A,C,mu_cv]= updateAC(simu_EEG,base,Phi,n_fold,nc_up);
-
+[AC,mu_cv]= updateAC(simu_EEG,base,Phi,n_fold);
+if i > 1
+    delta_AC = norm(AC-AC_old,'fro')/norm(AC_old,'fro');
+else 
+    delta_AC = 1;
+end
+disp(['update rate: ',num2str(delta_AC)]);
+AC_old = AC;
 
 %%%% update Phi
-Phi = (concatEEG-A*C*base)*(concatEEG-A*C*base)'/(len*trial);
+base_all = repmat(base,1,trial);
+base_all = base_all/norm(base_all(1,:),'fro');
+Phi = (concatEEG-AC*base_all)*(concatEEG-AC*base_all)'/(len*trial);
 
 
 end
 
+
+
 end
 
 
-function [A,C,mu_cv]= updateAC(simu_EEG,base,Phi,n_fold,nc_up)
+function [AC,mu_cv]= updateAC(simu_EEG,base,Phi,n_fold)
 %%%%% solve the problem ||X-B*\Phi||_F^2+\mu*||B||_*
 %%%%% using cross-validation to determine the right parameter \mu
 Phi_nsqrt = Phi^-0.5;
@@ -122,7 +131,7 @@ Phi_sqrt = Phi^ 0.5;
 K = size(base,1);
 % A_temp = zeros(chan,nc_up,n_fold);
 % C_temp = zeros(nc_up,K,n_fold);
-mu_test = [10^-4 10^-3 10^-2 10^-1];
+mu_test = 10.^[-2:0.1:-1];
 n_mu = length(mu_test);
 error_cv = zeros(n_mu,n_fold);
 
@@ -134,8 +143,12 @@ end
 trial_index = trial_index(1:n_fold*trial_perfold);
 trial_index  = reshape(trial_index,n_fold,trial_perfold);
 
-base_train = repmat(base,1,(n_fold-1)*trial_perfold);
+base_train = repmat(base,1,(n_fold-1)*trial_perfold);%% how to normalize?
+norm_base = norm(base_train(1,:),'fro');
+base_train = base_train/norm_base;
 base_test = repmat(base,1,trial_perfold);
+base_test = base_test/norm_base;
+
 
 for ifold = 1:n_fold
     fold_test = false(n_fold,1);
@@ -152,9 +165,9 @@ for ifold = 1:n_fold
     X_tilde_test = simu_EEG(:,:,test_index);
     X_tilde_test = Phi_nsqrt*X_tilde_test(:,:);
     %%%%%%%%%%%%%%%% re think about it
-    [U,S,V] = mexsvd(base_train',0); 
-    G = S; 
-    H = U'*X_tilde_train'; 
+    %[U,S,V] = mexsvd(base_train',0); 
+    G = sparse(eye(min(size(base_train)))); 
+    H = base_train*X_tilde_train'; 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     bb = H(:); 
     Amap  = @(X) Amap_MLR(X,G);
@@ -185,7 +198,7 @@ for ifold = 1:n_fold
         [AC_tilde,iter,time,sd,hist] = ...
         APGL(K,chan,problem_type,Amap,ATmap,bb,mutarget,0,par);
 
-         [U_ac,D_ac,V_ac] = svd(AC_tilde,'econ');
+         %[U_ac,D_ac,V_ac] = svd(AC_tilde,'econ'); 
 %         I_kpt = diag(D_ac) < 10^-4;
 %         U_ac = U_ac(:,I_kpt);
 %         D_ac = D_ac(I_kpt,I_kpt);
@@ -193,25 +206,27 @@ for ifold = 1:n_fold
 %         AC_tilde = U_ac*D_ac*V_ac;
 
         error_cv(imu,ifold) = ...
-        norm(X_tilde_test-AC_tilde'*base_test,'fro') + mutarget*trace(abs(D_ac));
+        0.5*norm(X_tilde_test'-base_test'*AC_tilde,'fro')^2;% + mutarget*sum(sd);
     end
 
 end
 
 error_cv_mean = mean(error_cv,2);
-error_cv_std = std(error_cv,0,2);
+error_cv_std = std(error_cv,0,2)/sqrt(n_fold);
 [Y,I] = min(error_cv_mean);
-mu_cv = mu_test(I);
+I_d = error_cv_mean <= (Y+error_cv_std(I));
 
-%mu_cv = 10^-2;
+mu_cv = max(mu_test(I_d));
+figure
+errorbar(log10(mu_test),error_cv_mean,error_cv_std)
+%mu_cv = 10^-1;
 %X_tilde_train = simu_EEG(:,:,train_index);
 X_tilde = Phi_nsqrt*simu_EEG(:,:);
-base = repmat(base,1,trial);
-
+base_all = repmat(base,1,trial);
+base_all = base_all/norm(base_all(1,:),'fro');
     
-[U,S,V] = mexsvd(base',0); 
-G = S; 
-H = U'*X_tilde'; 
+G = sparse(eye(min(size(base_all)))); 
+H = base_all*X_tilde'; 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 bb = H(:); 
 Amap  = @(X) Amap_MLR(X,G);
@@ -237,7 +252,7 @@ APGL(K,chan,problem_type,Amap,ATmap,bb,mutarget,0,par);
 
 [U_ac,D_ac,V_ac] = svd(AC_tilde,'econ');
 trac = trace(D_ac);
-I_kpt = diag(D_ac)/trac > 5*10^-2;
+I_kpt = diag(D_ac)/trac > 10^-2;
 U_ac = U_ac(:,I_kpt);
 D_ac = D_ac(I_kpt,I_kpt);
 V_ac = V_ac(:,I_kpt);
