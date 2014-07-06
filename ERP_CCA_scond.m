@@ -104,23 +104,27 @@ AC_old = zeros(chan,2*K);
 n_fold = 5;
 delta_AC = 1;
 i = 0;
-while (delta_AC > 10^-6)&& (i<20)
 
+base_all = repmat(base,1,trial);
+L = zeros(1,20);
+while (delta_AC > 10^-6)&& (i<20)
+%while i<20
 i = i+1;
 %%%% update A C
 
-[AC,mu_cv,num_comp]= updateAC(simu_EEG,base,Phi,n_fold);
+[AC,mutarget,num_comp]= updateAC(simu_EEG,base,Phi,n_fold);
 if i > 1
     delta_AC = norm(AC-AC_old,'fro')/norm(AC_old,'fro');
 end
-disp(['update rate: ',num2str(delta_AC),' \mu after cross-validation',num2str(mu_cv)]);
+disp(['update rate: ',num2str(delta_AC),' \mu after cross-validation',num2str(mutarget)]);
 AC_old = AC;
 
 %%%% update Phi
-base_all = repmat(base,1,trial);
+
 %base_all = base_all/norm(base_all(1,:),'fro');
 Phi = (concatEEG-AC*base_all)*(concatEEG-AC*base_all)'/(len*trial);
 
+L(i) = objfunc(simu_EEG,Phi,AC,base_all,mutarget,num_comp);
 
 end
 
@@ -139,7 +143,7 @@ Z(1:nc_est,:) = C(1:nc_est,:)*base;
 end
 
 
-function [AC,mu_cv,num_comp]= updateAC(simu_EEG,base,Phi,n_fold)
+function [AC,mutarget,num_comp]= updateAC(simu_EEG,base,Phi,n_fold)
 %%%%% solve the problem ||X-B*\Phi||_F^2+\mu*||B||_*
 %%%%% using cross-validation to determine the right parameter \mu
 Phi_nsqrt = Phi^-0.5;
@@ -289,6 +293,18 @@ AC_tilde = U_ac*D_ac*V_ac';
 
 AC = Phi_sqrt*AC_tilde';
 
+
+end
+
+
+function L = objfunc(simu_EEG,Phi,AC,base_all,mutarget,num_comp)
+[chan,len,trial] = size(simu_EEG);
+concatEEG = simu_EEG(:,:);
+nv = (concatEEG-AC*base_all);
+%L = trace(nv*nv'*Phi^-1)+len*trial*log(det(Phi))+mutarget*num_comp;
+L1 = trace(nv*nv'*Phi^-1)+len*trial*log(det(Phi));
+L2 = mutarget*sum(svd(Phi^-0.5*AC));
+L = L1+L2;
 
 end
 %------------- END OF CODE --------------
