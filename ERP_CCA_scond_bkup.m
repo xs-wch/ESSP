@@ -1,4 +1,4 @@
-function [SP,SF,C,Z,nc_est,Phi] = ERP_CCA_scond_bkup(simu_EEG,frq_low,frq_up,nc_up,fs)
+function [SP,SF,C,Z,nc_est,Phi] = ERP_CCA_scond_bkup(simu_EEG,frq_low,frq_up,nc_up,fs,figure_flag)
 %ERP_CCA_sparse - ERP extraction with sparse CCA
 %
 %
@@ -80,12 +80,12 @@ end
 %nc = nc_up; % number of components
 K_up = floor(frq_up/(fs/len)); % number of frequency
 K_low = floor(frq_low/(fs/len));
-deltaK = floor(fs/len);
+%deltaK = floor(fs/len);
 K = K_up-K_low;
 base = zeros(2*K,len);
 for i = 1:K
-	base(i,:) = sin(2*pi*(i*deltaK+K_low)/len*[0:len-1]);
-	base(i+K,:) = cos(2*pi*(i*deltaK+K_low)/len*[0:len-1]);
+	base(i,:) = sin(2*pi*(i+K_low)/len*[0:len-1]);
+	base(i+K,:) = cos(2*pi*(i+K_low)/len*[0:len-1]);
 end 
 
 % %%%% base norm = 1
@@ -113,7 +113,7 @@ while (delta_AC > 10^-6)&& (i<20)
 i = i+1;
 %%%% update A C
 
-[AC,mu_cv,num_comp]= updateAC(simu_EEG,base,Phi,n_fold);
+[AC,mu_cv,num_comp]= updateAC(simu_EEG,base,Phi,n_fold,figure_flag,true);
 if i > 1
     delta_AC = norm(AC-AC_old,'fro')/norm(AC_old,'fro');
 end
@@ -143,7 +143,7 @@ Z(1:nc_est,:) = C(1:nc_est,:)*base;
 end
 
 
-function [AC,mu_cv,num_comp]= updateAC(simu_EEG,base,Phi,n_fold)
+function [AC,mu_cv,num_comp]= updateAC(simu_EEG,base,Phi,n_fold,figure_flag,onesd_flag)
 %%%%% solve the problem ||X-B*\Phi||_F^2+\mu*||B||_*
 %%%%% using cross-validation to determine the right parameter \mu
 Phi_nsqrt = Phi^-0.5;
@@ -154,7 +154,7 @@ Phi_sqrt = Phi^ 0.5;
 K = size(base,1);
 % A_temp = zeros(chan,nc_up,n_fold);
 % C_temp = zeros(nc_up,K,n_fold);
-mu_test = 10.^[-2:0.2:-0.4];
+mu_test = [10.^[-1.6:0.2:-0.4]];
 n_mu = length(mu_test);
 error_cv = zeros(n_mu,n_fold);
 
@@ -238,7 +238,13 @@ end
 error_cv_mean = mean(error_cv,2);
 error_cv_std = std(error_cv,0,2)/sqrt(n_fold);
 [Y,I] = min(error_cv_mean);
-I_d = error_cv_mean <= (Y+error_cv_std(I));
+if onesd_flag
+   
+    I_d = error_cv_mean <= (Y+error_cv_std(I));
+else
+    I_d = I;
+end
+   
 
 mu_cv = max(mu_test(I_d));
 
@@ -247,9 +253,10 @@ mu_cv = max(mu_test(I_d));
 % error_cv_std = std(error_cv,0,2)/sqrt(n_fold);
 % [Y,I] = min(error_cv_mean);
 % mu_cv = mu_test(I);
-
-figure
-errorbar(log10(mu_test),error_cv_mean,error_cv_std)
+if figure_flag
+    figure
+    errorbar(log10(mu_test),error_cv_mean,error_cv_std);
+end
 % mu_cv = 10^-1;
 %X_tilde_train = simu_EEG(:,:,train_index);
 X_tilde = Phi_nsqrt*simu_EEG(:,:);
