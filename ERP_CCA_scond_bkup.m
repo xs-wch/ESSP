@@ -1,5 +1,5 @@
 function [SP,SF,C,Z,nc_est,Phi] = ERP_CCA_scond(simu_EEG,frq_up,nc_up,fs)
-%ERP_CCA_sparse - ERP extraction with sparse CCA
+%ERP_CCA_sparse - ERP extraction with ESSP
 %
 %
 % Syntax:  [A,C] = ERP_CCA_sparse(simu_EEG,frq_up,nc_up,fs)
@@ -9,20 +9,22 @@ function [SP,SF,C,Z,nc_est,Phi] = ERP_CCA_scond(simu_EEG,frq_up,nc_up,fs)
 %    frq_up - frequency uplimit (defult 100Hz)
 %    nc_up - number of ERP components uplimit (defult 10)
 %    fs - sample rate (defult 1000)
-%    lambda - parameter to control sparseness; a vectot containing all possible parameters
+
 %
 % Outputs:
-%    A - spatial pattern of the ERP components chan*nc_up
+%    SP - spatial pattern of the ERP components chan*nc_up
+%    SF - spatial filter of the ERP components nc_up*chan
 %    C - coefficient matrix nc_up*2K
 %    nc_est - number of components estimated by this method
+%    Phi- spontaneous EEG spatial pattern
 % Example: 
-%    [A,C,nc_est] = ERP_CCA_sparse(simu_EEG,100,10,1000,4)
+%    [SP,SF,C,Z,nc_est,Phi] = ERP_CCA_sparse(simu_EEG,100,10,1000,4)
 %
 % Other m-files required: ERP_date_gen.m f_alpha_gaussian.m
 % Subfunctions: none
 % MAT-files required: none
 %
-% See also: OTHER_FUNCTION_NAME1,  OTHER_FUNCTION_NAME2
+
 
 % Author: Chaohua Wu
 % Department of Biomedical Engineering, Tsinghua University
